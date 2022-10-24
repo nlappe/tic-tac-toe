@@ -1,4 +1,11 @@
+import 'dart:math';
+
 import 'package:flutter/material.dart';
+import 'package:t3/dialogues/draw.dart';
+import 'package:t3/dialogues/win.dart';
+
+import 'models/game_states.dart';
+import 'models/player_config.dart';
 
 void main() => runApp(const MyApp());
 
@@ -20,49 +27,92 @@ class GamePage extends StatefulWidget {
   _GamePageState createState() => _GamePageState();
 }
 
-class _PlayerConfig {
-  _PlayerConfig({
-    required this.char,
-    required this.color,
-  });
-
-  String char;
-  Color color;
-}
-
-enum _GameStates {
-  RUNNING,
-  WON,
-  DRAW,
-}
-
 class _GamePageState extends State<GamePage> {
-  _PlayerConfig? winner;
+  _GamePageState() {
+    playerSettings = [
+      PlayerConfig(char: 'X', color: Colors.blue),
+      PlayerConfig(char: 'O', color: Colors.red),
+      PlayerConfig(char: '🤣', color: Colors.green),
+    ];
+    crossAxisItemCount = streakToWin * (playerSettings.length - 1);
+    gridItemCount = pow(crossAxisItemCount, 2).toInt();
+    int verticalSize = (gridItemCount / crossAxisItemCount).round();
 
-  Map<int, _PlayerConfig> gameMap = {};
+    for (int vertical = 0; vertical < verticalSize; vertical++) {
+      List<int> col = [];
+      for (int horizontal = 0; horizontal < crossAxisItemCount; horizontal++) {
+        col.add((vertical * crossAxisItemCount) + horizontal);
+      }
+      horizontalIndices.add(col);
 
-  List<_PlayerConfig> playerSettings = [
-    _PlayerConfig(char: 'X', color: Colors.blue),
-    _PlayerConfig(char: 'O', color: Colors.red),
-    //   _PlayerConfig(char: '🤣', color: Colors.green),
-  ];
+      // vertical - top left to bot right
+      generateDiagonalIndices(
+        vertical * crossAxisItemCount,
+        crossAxisItemCount + 1,
+        0,
+      );
 
-  int round = 0;
+      //vertical - top right to bot left
+      generateDiagonalIndices(
+        (1 + vertical) * crossAxisItemCount - 1,
+        crossAxisItemCount - 1,
+        crossAxisItemCount - 1,
+      );
+    }
 
-  _GameStates gameState = _GameStates.RUNNING;
+    for (int horizontal = 0; horizontal < crossAxisItemCount; horizontal++) {
+      List<int> row = [];
+      for (int vertical = 0; vertical < verticalSize; vertical++) {
+        row.add((vertical * (verticalSize)) + horizontal);
+      }
+      verticalIndices.add(row);
+
+      // diagonal - top left to bot left
+      generateDiagonalIndices(
+        horizontal,
+        crossAxisItemCount - 1,
+        crossAxisItemCount - 1,
+      );
+
+      // horizontal - top left to bot right
+      generateDiagonalIndices(
+        horizontal,
+        crossAxisItemCount + 1,
+        0,
+      );
+    }
+
+    print(horizontalIndices);
+    print(verticalIndices);
+    print(diagonalIndices);
+  }
+
+  late List<PlayerConfig> playerSettings;
+  late int crossAxisItemCount;
+  late int gridItemCount;
+
+  int streakToWin = 3;
+
+  GameStates gameState = GameStates.RUNNING;
+
+  PlayerConfig? winner;
+  Map<int, PlayerConfig> gameMap = {};
+
+  List<List<int>> horizontalIndices = [];
+  List<List<int>> verticalIndices = [];
+  List<List<int>> diagonalIndices = [];
 
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      backgroundColor: Colors.grey[800],
+      backgroundColor: Colors.grey.shade800,
       body: Column(
         children: [
           Center(
               child: ElevatedButton(
                   onPressed: reset,
-                  child: Text('Reset $round',
-                      style:
-                          const TextStyle(color: Colors.white, fontSize: 64)))),
+                  child: const Text('Reset',
+                      style: TextStyle(color: Colors.white, fontSize: 64)))),
           Expanded(
             child: chooseGameAreaFiller(),
           ),
@@ -76,85 +126,55 @@ class _GamePageState extends State<GamePage> {
       return;
     }
 
-    setState(
-        () => {gameMap[index] = playerSettings[round % playerSettings.length]});
-    round++;
+    setState(() => {
+          gameMap[index] =
+              playerSettings[gameMap.length % playerSettings.length]
+        });
 
     checkForWin();
   }
 
   void reset() {
-    round = 0;
     setState(() => {
           gameMap = {},
-          gameState = _GameStates.RUNNING,
+          gameState = GameStates.RUNNING,
         });
   }
 
   void checkForWin() {
-    if (round < (playerSettings.length * 3) - 1) {
-      return;
+    PlayerConfig? horizontalWinningPlayer = processIndicesForWinner([
+      ...horizontalIndices,
+      ...verticalIndices,
+      ...diagonalIndices,
+    ]);
+    if (horizontalWinningPlayer != null) {
+      setState(() => {
+            winner = horizontalWinningPlayer,
+            gameState = GameStates.WON,
+          });
     }
 
-    List<List<int>> winningCombinations = [
-      [1, 2, 3],
-      [4, 5, 6],
-      [7, 8, 9],
-      [1, 4, 7],
-      [2, 5, 8],
-      [3, 6, 9],
-      [1, 5, 9],
-      [3, 5, 7],
-    ];
-
-    for (List<int> winningRow in winningCombinations) {
-      Iterable<_PlayerConfig?> mappedPlayersInRow =
-          winningRow.map((index) => gameMap[index - 1]);
-
-      bool isWinner = mappedPlayersInRow.every((element) =>
-          element != null && element.char == mappedPlayersInRow.first?.char);
-
-      if (isWinner) {
-        setState(() => {
-              gameState = _GameStates.WON,
-              winner = mappedPlayersInRow.first,
-            });
-        return;
-      }
-    }
-
-    if (round >= 9) {
-      setState(() => {gameState = _GameStates.DRAW});
+    if (gameMap.length >= gridItemCount) {
+      setState(() => {gameState = GameStates.DRAW});
     }
   }
 
   Widget chooseGameAreaFiller() {
     switch (gameState) {
-      case _GameStates.RUNNING:
+      case GameStates.RUNNING:
         return getGridView();
-      case _GameStates.DRAW:
-        return const Center(
-          child: Text(
-            'IT\'S A DRAW',
-            style: TextStyle(fontSize: 128, color: Colors.yellow),
-          ),
-        );
-      case _GameStates.WON:
-        return Center(
-          child: Text(
-            '${winner?.char ?? ''} WON!',
-            style:
-                TextStyle(fontSize: 128, color: winner?.color ?? Colors.yellow),
-          ),
-        );
+      case GameStates.DRAW:
+        return Draw();
+      case GameStates.WON:
+        return Win(winner!);
     }
   }
 
   Widget getGridView() {
     return GridView.builder(
-        itemCount: 9,
-        gridDelegate:
-            const SliverGridDelegateWithFixedCrossAxisCount(crossAxisCount: 3),
+        itemCount: gridItemCount,
+        gridDelegate: SliverGridDelegateWithFixedCrossAxisCount(
+            crossAxisCount: crossAxisItemCount),
         itemBuilder: (BuildContext context, int index) {
           return GestureDetector(
             onTap: () => tapped(index),
@@ -171,5 +191,47 @@ class _GamePageState extends State<GamePage> {
             ),
           );
         });
+  }
+
+  PlayerConfig? processIndicesForWinner(List<List<int>> indices) {
+    for (List<int> line in indices) {
+      String string =
+          line.map((lineIndex) => gameMap[lineIndex]?.char ?? '').join('');
+      if (string.length < streakToWin) {
+        continue;
+      }
+
+      for (PlayerConfig playerConfig in playerSettings) {
+        String playerChar = playerConfig.char;
+        if (string.contains(playerChar * streakToWin)) {
+          return playerConfig;
+        }
+      }
+    }
+    return null;
+  }
+
+  void generateDiagonalIndices(int horizontalReferenceColIndex,
+      int loopIndexAddition, int crossAxisComparator) {
+    bool leftInBoundary = true;
+    List<int> leftDiagonalRow = [];
+
+    int leftTargetIndex = horizontalReferenceColIndex;
+
+    leftDiagonalRow.add(leftTargetIndex);
+
+    while (leftInBoundary) {
+      leftTargetIndex = leftTargetIndex + loopIndexAddition;
+      if (leftTargetIndex < 0 ||
+          leftTargetIndex % crossAxisItemCount == crossAxisComparator) {
+        leftInBoundary = false;
+        break;
+      }
+      leftDiagonalRow.add(leftTargetIndex);
+    }
+
+    if (leftDiagonalRow.length >= streakToWin) {
+      diagonalIndices.add(leftDiagonalRow);
+    }
   }
 }
