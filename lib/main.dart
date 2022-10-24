@@ -33,58 +33,13 @@ class _GamePageState extends State<GamePage> {
       PlayerConfig(char: 'X', color: Colors.blue),
       PlayerConfig(char: 'O', color: Colors.red),
       PlayerConfig(char: '🤣', color: Colors.green),
+      PlayerConfig(char: '🙃', color: Colors.purple),
     ];
-    crossAxisItemCount = streakToWin * (playerSettings.length - 1);
-    gridItemCount = pow(crossAxisItemCount, 2).toInt();
+    initGridSizes();
     int verticalSize = (gridItemCount / crossAxisItemCount).round();
 
-    for (int vertical = 0; vertical < verticalSize; vertical++) {
-      List<int> col = [];
-      for (int horizontal = 0; horizontal < crossAxisItemCount; horizontal++) {
-        col.add((vertical * crossAxisItemCount) + horizontal);
-      }
-      horizontalIndices.add(col);
-
-      // vertical - top left to bot right
-      generateDiagonalIndices(
-        vertical * crossAxisItemCount,
-        crossAxisItemCount + 1,
-        0,
-      );
-
-      //vertical - top right to bot left
-      generateDiagonalIndices(
-        (1 + vertical) * crossAxisItemCount - 1,
-        crossAxisItemCount - 1,
-        crossAxisItemCount - 1,
-      );
-    }
-
-    for (int horizontal = 0; horizontal < crossAxisItemCount; horizontal++) {
-      List<int> row = [];
-      for (int vertical = 0; vertical < verticalSize; vertical++) {
-        row.add((vertical * (verticalSize)) + horizontal);
-      }
-      verticalIndices.add(row);
-
-      // diagonal - top left to bot left
-      generateDiagonalIndices(
-        horizontal,
-        crossAxisItemCount - 1,
-        crossAxisItemCount - 1,
-      );
-
-      // horizontal - top left to bot right
-      generateDiagonalIndices(
-        horizontal,
-        crossAxisItemCount + 1,
-        0,
-      );
-    }
-
-    print(horizontalIndices);
-    print(verticalIndices);
-    print(diagonalIndices);
+    initVertical(verticalSize);
+    initHorizontal(verticalSize);
   }
 
   late List<PlayerConfig> playerSettings;
@@ -182,7 +137,7 @@ class _GamePageState extends State<GamePage> {
               decoration: BoxDecoration(border: Border.all(color: Colors.grey)),
               child: Center(
                 child: Text(
-                  '${(gameMap[index]?.char ?? '')} $index',
+                  (gameMap[index]?.char ?? ''),
                   style: TextStyle(
                       color: gameMap[index]?.color ?? Colors.white,
                       fontSize: 64),
@@ -196,7 +151,7 @@ class _GamePageState extends State<GamePage> {
   PlayerConfig? processIndicesForWinner(List<List<int>> indices) {
     for (List<int> line in indices) {
       String string =
-          line.map((lineIndex) => gameMap[lineIndex]?.char ?? '').join('');
+          line.map((lineIndex) => gameMap[lineIndex]?.char).join('');
       if (string.length < streakToWin) {
         continue;
       }
@@ -233,5 +188,58 @@ class _GamePageState extends State<GamePage> {
     if (leftDiagonalRow.length >= streakToWin) {
       diagonalIndices.add(leftDiagonalRow);
     }
+  }
+
+  void initHorizontal(int verticalSize) {
+    for (int horizontal = 0; horizontal < crossAxisItemCount; horizontal++) {
+      List<int> row = [];
+      for (int vertical = 0; vertical < verticalSize; vertical++) {
+        row.add((vertical * (verticalSize)) + horizontal);
+      }
+      verticalIndices.add(row);
+
+      // diagonal - top left to bot left
+      generateDiagonalIndices(
+        horizontal,
+        crossAxisItemCount - 1,
+        crossAxisItemCount - 1,
+      );
+
+      // horizontal - top left to bot right
+      generateDiagonalIndices(
+        horizontal,
+        crossAxisItemCount + 1,
+        0,
+      );
+    }
+  }
+
+  void initVertical(int verticalSize) {
+    for (int vertical = 0; vertical < verticalSize; vertical++) {
+      List<int> col = [];
+      for (int horizontal = 0; horizontal < crossAxisItemCount; horizontal++) {
+        col.add((vertical * crossAxisItemCount) + horizontal);
+      }
+      horizontalIndices.add(col);
+
+      // vertical - top left to bot right
+      generateDiagonalIndices(
+        vertical * crossAxisItemCount,
+        crossAxisItemCount + 1,
+        0,
+      );
+
+      //vertical - top right to bot left
+      generateDiagonalIndices(
+        (1 + vertical) * crossAxisItemCount - 1,
+        crossAxisItemCount - 1,
+        crossAxisItemCount - 1,
+      );
+    }
+  }
+
+  void initGridSizes() {
+    crossAxisItemCount = streakToWin * (playerSettings.length - 1);
+    gridItemCount = pow(crossAxisItemCount, 2).toInt();
   }
 }
